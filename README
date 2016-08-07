@@ -1,0 +1,111 @@
+TODO HANDLE ERRORS IN FEN
+SEARCH ASSERTS
+
+Will Entriken - 2007-2010
+
+This paper describes how to encode any legal chess position in less than ??? bits.
+
+==Denoting armies==
+
+Each player has an army that may be written as :
+
+   <-  A   ->  <-  B   ->  <-      C        ->
+K  P  P  P  P  X  X  X  X  Q  R  R  B  B  N  N
+
+Where
+  - X may be one of [QRNB]
+  - A + B <= 8
+  - Any piece but K is optional
+
+We will find every possible army for each player. While doing this, we will keep a note of the following for each army:
+  - A = The number of pawns (since pawns can only be placed on the 8x6 rectangle) 
+  - S = The size of the army (to determine the number of empty squares)
+  - P = The product of the factorial of the number of each type of piece (how indistinguishable is the set?)
+        This is used in the denominator of the combinatorics later on
+
+The program armies lists each possible army for a player, as well [A,S,P] for each one. There are 8694 distinct armies that either player may attain. There are 838 distinct combinations of [A,S,P].
+
+  Armies: ./armies | wc -l
+  Distinct [A,S,P]: ./armies | cut -f1-3 | sort -u | wc -l
+
+
+==More about armies==
+
+Either player can have any army of the form described above. However, not every combination of each player's armies is possible. For example, either white or black may get an army full of Knights (KQRRBBNNNNNNNNNN), but not both. Note: The second player uses lower case for all notation.
+
+Why?
+
+Because in order to promote a pawn, one of the following must happen:
+  - the pawn in question makes a capture
+  - the opponent's pawn on that file makes a capture
+  - the opponent's pawn on that file is captured
+
+Therefore, if white's pawn captures one of blacks's pawns, at most two white pawns and one black pawn may promote. Any other capture may lead to a maximum of one promotion per player. [An illustration here would be awesome]
+
+There is thus a limit on B:
+
+  B <= 2*(8-a-b) + 14-C-c + 8-A-B
+
+Which simplifies:
+
+  A+2a+2b+2B+C+c <= 38 (this is symmetric for either player)
+
+Counting white and black, there are 58084310 attainable army pairs, with only 23773 distinct combinations of [A+a,S+s,P*p].
+
+  Armies: ./armies-both | wc -l # SLOW commands
+  Distinct [A+a,S+s,P*p]: ./armies-both > tmp; cat tmp | sort -u | wc -l
+
+
+==Placement==
+
+For any two armies, we have [A, S, P, a, s, p] and are able to calculate how many ways those pieces can be placed on the board. This number is: 48! * (64-A-a)! / (48-A-a)! / (64-S-s)! / P / p.
+
+   48!      (64-A-a)!
+--------- * ---------
+(48-A-a)!   (64-S-s)!
+
+---------------------
+
+        P * p  
+
+
+==Method==
+
+We demonstrate an upper bound by encoding any legal chess position (board diagram, next to act, castling rights, en passant, and fifty-move state) -- as well as some illegal ones -- into in integer named Chess Position Integer. We define an ordering for all positions by comparing the fooling in sequence:
+
+* En passant: none possible, on file A, on file B, ...
+* Castling rights (cannot, can), evaluated in order
+  * Next to act kingside 
+  * Next to act queenside
+  * Not next to act kingside
+  * Not next to act queenside
+* White is next to act, black is next to act
+* Next to act's then not next to act's number pieces, evaluated in order of
+  * Pawns, queens, rooks, bishops, knights
+* Placement of next to act king on square 1, ..., 64 
+* Placement of not next to act king on square 1, ..., 64 
+* Square 1 (reading rank 8 to 1, file A to H)
+  * Has a white piece, has a black piece, is empty
+  * If not empty, the piece is king, pawn, queen, rook, bishop, knight
+...
+* Square 64
+
+***** THIS WEIRD ORDERING is because en passant affects restrictions on next to act, not the other player, this complicates symmetry
+
+A program was written to count all such positions. This was done by considering every case in lexicographical order, and using permutations when possible. Also, a program was written to convert Chess Position Integer to and from Forsyth–Edwards Notation. Both of these programs are available to the public at **URL**.
+
+
+==Results==
+
+  Count positions: ./ub ******ONLY INCLUDES WITHOUT CASTLING OR ENPASSENT**********
+
+Possible positions: 24639467089379915386890365075260915223928803040
+log_2:              154.109
+log_10:             46.391
+
+Therefore, given a chess position, this method can assign a number between 1 and 246…040 to it. This is reversible as well.
+
+
+==Conclusion==
+
+We have demonstrated an ordering of all chess positions and released a program to convert any legal chess position into an integer which we define as the Chess Position Integer.
